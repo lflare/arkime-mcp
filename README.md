@@ -1,6 +1,6 @@
 # Arkime MCP Server
 
-[Model Context Protocol](https://modelcontextprotocol.io/) server that connects your AI assistant to an [Arkime](https://arkime.com/) network traffic analysis deployment. Exposes **30 tools** for searching sessions, extracting PCAP data, hunting threats, building attack timelines, and performing network forensics -- all through natural language.
+[Model Context Protocol](https://modelcontextprotocol.io/) server that connects your AI assistant to an [Arkime](https://arkime.com/) network traffic analysis deployment. Exposes **55 read-only tools** for searching sessions, extracting PCAP data, hunting threats, building attack timelines, inspecting cluster/Elasticsearch health, and performing network forensics -- all through natural language.
 
 ## What This Does
 
@@ -61,7 +61,7 @@ For production deployments, set these variables in your deployment environment (
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/lflare/arkime-mcp.git
 cd arkime-mcp
 
 # Install dependencies
@@ -258,6 +258,51 @@ The server will output `Arkime MCP Server running on stdio` to stderr and wait f
 | `app-info` | Get comprehensive application information: current user, Elasticsearch health, cluster status, and view counts. |
 | `node-stats` | Get per-node statistics: packets processed, bytes captured, sessions created, and node roles. |
 
+### Field Aggregation & Query Building
+
+| Tool | Description |
+|------|-------------|
+| `spi-graph` | Aggregate a single field across matching sessions and return value counts (a spigraph). Great for "top values" of any field over a time range. |
+| `spi-graph-hierarchy` | Aggregate an ordered list of fields as a nested hierarchy (treemap/pie data) for drill-down analysis. |
+| `build-query` | Compile an Arkime search expression into the underlying OpenSearch/Elasticsearch query *without running it*. Validates syntax and catches mistakes like `AND` vs `&&` or `source.ip` vs `ip.src`. |
+| `list-decodings` | List the packet decodings (gzip, base64, etc.) Arkime can apply when extracting session data. |
+
+### Configuration & Metadata Listings
+
+| Tool | Description |
+|------|-------------|
+| `cron-list` | List periodic (cron) queries -- saved expressions that run on a schedule to tag matching sessions. |
+| `notifier-list` | List configured notifiers (Slack, email, webhook, etc.) used for alerts. |
+| `shareable-list` | List shareable links/items configured in Arkime. |
+| `history-list` | List recent API request history (audit log) for the current user. |
+| `remote-clusters` | List remote Arkime clusters known to this viewer (cross-cluster search and forwarding). |
+| `current-user` | Get the current authenticated user, including ID, name, and assigned roles/permissions. |
+| `user-roles` | List the roles the current user is allowed to see or assign. |
+| `value-actions` | List configured right-click value actions (custom menu actions on field values). |
+| `field-actions` | List configured field actions (custom menu actions on fields). |
+
+### Elasticsearch & Cluster Health
+
+| Tool | Description |
+|------|-------------|
+| `es-health` | Get Elasticsearch/OpenSearch cluster health: status (green/yellow/red), node counts, and shard counts. |
+| `es-stats` | Get per-node Elasticsearch/OpenSearch statistics (heap, disk, document counts, load). |
+| `es-indices` | List the Elasticsearch/OpenSearch indices backing Arkime, with sizes and document counts. |
+| `es-shards` | Show shard allocation across nodes, including any allocation excludes. |
+| `es-tasks` | List currently running Elasticsearch/OpenSearch tasks. Useful for spotting stuck operations. |
+| `es-recovery` | Show shard recovery status (shards relocating or initializing). |
+| `node-dstats` | Get time-series stats for a capture node (or ALL nodes), e.g. deltaPackets/deltaBytes over a window. Useful for spotting capture gaps. |
+| `app-version` | Get the Arkime viewer version and backend Elasticsearch/OpenSearch version. |
+
+### Session Binary Data
+
+| Tool | Description |
+|------|-------------|
+| `get-session-packets` | Get the decoded per-packet breakdown Arkime parsed for a session (structured JSON). Requires `nodeId` and `sessionId`. |
+| `get-session-pcap` | Extract the entire PCAP for a single session as a base64 resource for Wireshark. Requires `nodeId` and `sessionId`. |
+| `get-session-raw` | Extract the raw packet payload bytes for a single session as a base64 resource. Requires `nodeId` and `sessionId`. |
+| `get-session-body` | Extract a specific transferred body/file from a session by body type and index, as a base64 resource. |
+
 ## Example Workflows
 
 ### Investigate a Suspect Host
@@ -341,7 +386,7 @@ npm run typecheck
 src/
 ├── index.ts                 # Entry point (stdio transport)
 ├── server.ts                # MCP server creation
-├── controllers/             # Request handlers (30 tools)
+├── controllers/             # Request handlers (55 tools)
 │   ├── sessions.ts          # search-sessions, get-session, get-session-spi
 │   ├── pcap.ts              # get-pcap (bulk PCAP extraction)
 │   ├── packet.ts            # get-packet (single session PCAP)
@@ -353,9 +398,15 @@ src/
 │   ├── gap-fill.ts          # sessions-summary, multi-unique, connections, spi-sessions,
 │   │                         # session-detail, hunt-list, view-list, shortcut-list,
 │   │                         # app-info, node-stats, session-file
+│   ├── analytics.ts         # spi-graph, spi-graph-hierarchy, build-query, list-decodings
+│   ├── metadata.ts          # cron-list, notifier-list, shareable-list, history-list, remote-clusters,
+│   │                         # current-user, user-roles, value-actions, field-actions
+│   ├── es-health.ts         # es-health, es-stats, es-indices, es-shards, es-tasks, es-recovery,
+│   │                         # node-dstats, app-version
+│   ├── session-data.ts      # get-session-packets, get-session-pcap, get-session-raw, get-session-body
 │   └── fields.ts            # list-fields
 ├── tools/
-│   ├── schemas.ts           # 32 Zod validation schemas
+│   ├── schemas.ts           # Zod validation schemas (one per tool)
 │   └── index.ts             # Tool registration
 ├── services/
 │   ├── arkime-client.ts     # Arkime API client (digest auth)
@@ -395,4 +446,4 @@ This server uses the Arkime v3 API. Check your Arkime version with the `app-info
 
 ## License
 
-ISC
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-or-later). See the [`LICENSE`](LICENSE) file for the full text.
